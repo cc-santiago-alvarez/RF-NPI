@@ -22,6 +22,9 @@
 #define NRF_CE_PIN_C    15  
 #define NRF_CSN_PIN_C   2  
 
+// led
+#define LED_PIN   14
+
 // Common dependencies
 #include "setting.h"
 #include <Arduino.h>

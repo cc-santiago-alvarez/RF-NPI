@@ -93,7 +93,9 @@ void conf() {
   u8g2.sendBuffer();
   delay(3000);
   u8g2.clearBuffer();
-  u8g2.drawXBMP(0, 0, 128, 64, cred); 
+  u8g2.setFontMode(1);
+  u8g2.setBitmapMode(1);
+  u8g2.drawXBMP(20, 0, 85, 64, image_image_2__bits);
   u8g2.sendBuffer();
   delay(250);
 }

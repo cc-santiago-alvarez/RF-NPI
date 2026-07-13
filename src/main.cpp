@@ -154,8 +154,8 @@ static void drawHeaderBar() {
   u8g2.drawBox(0, 0, W, H);
   u8g2.setFont(FONT_SMALL);
   u8g2.setDrawColor(0);
-  u8g2.drawStr(PAD, TXT_Y, "RF-Clown");
-  const char* ver = "v2.0.0";
+  u8g2.drawStr(PAD, TXT_Y, "RF-NPI");
+  const char* ver = "v1.0.0";
   int vw = u8g2.getStrWidth(ver);
   u8g2.drawStr(W - vw - 4, TXT_Y, ver);
   u8g2.setDrawColor(1);
@@ -327,6 +327,8 @@ void setup() {
   pinMode(PIN_BTN_L,  INPUT_PULLUP);
   pinMode(PIN_BTN_R, INPUT_PULLUP);
   pinMode(PIN_BTN_S, INPUT_PULLUP);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
   attachInterrupt(digitalPinToInterrupt(PIN_BTN_L),  handleButton,  FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_BTN_R), handleButton1, FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_BTN_S), handleButton2, FALLING);
@@ -336,6 +338,9 @@ void setup() {
 }
 
 void loop() {
+  // Actualizar el LED según el estado actual
+  digitalWrite(LED_PIN, (current == ACTIVE_MODE) ? HIGH : LOW);
+
   checkMode();
   static Operation     lastActivity = current;
   static OperationMode lastFocus    = current_Mode;
