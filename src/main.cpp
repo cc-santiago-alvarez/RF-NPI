@@ -63,14 +63,8 @@ void initialize_Radios() {
   }
 }
 
-static const uint8_t HEADER_H = 12;
-static const uint8_t PAD      = 6;
-static const uint8_t CARD_H   = 36;
-static const uint8_t RADIUS   = 3;
-static const uint8_t DOT_Y    = 64 - 6;
-
 static const char* kMenuLabels[] = {
-  "WiFi", "Video TX", "RC", "BLE", "Bluetooth", "USB Wireless", "Zigbee", "NRF24"
+  "WiFi", "Video TX", "RC", "BLE", "Bluetooth", "USB", "Zigbee", "NRF24"
 };
 static const int kMenuCount = sizeof(kMenuLabels)/sizeof(kMenuLabels[0]);
 
@@ -146,139 +140,127 @@ void spectrum() {
   u8g2.sendBuffer();
 }
 
-static void drawHeaderBar() {
-  const uint8_t W = 128;
-  const uint8_t H = HEADER_H;
-  const uint8_t TXT_Y = 2;
-  u8g2.setDrawColor(1);
-  u8g2.drawBox(0, 0, W, H);
-  u8g2.setFont(FONT_SMALL);
-  u8g2.setDrawColor(0);
-  u8g2.drawStr(PAD, TXT_Y, "RF-NPI");
-  const char* ver = "v1.0.0";
-  int vw = u8g2.getStrWidth(ver);
-  u8g2.drawStr(W - vw - 4, TXT_Y, ver);
-  u8g2.setDrawColor(1);
-  u8g2.drawHLine(0, H - 1, W);
+// ---------------- New UI: two-panel RF-NPI screen ----------------
+// Panel izquierdo (branding + rana). Panel derecho (herramienta + toggle).
+// Coordenadas basadas en el diseno de lopaka (posicion de fuente por baseline).
+
+static const uint8_t* FONT_TOOL   = u8g2_font_haxrcorp4089_tr; // nombre de herramienta / estado
+static const uint8_t* FONT_BRAND  = u8g2_font_4x6_tr;          // "RF-NPI" / version
+
+static const int RB_X      = 60;   // x del panel derecho
+static const int RB_W      = 66;   // ancho del panel derecho
+static const int RB_INX0   = 62;   // interior izq (para clip de texto)
+static const int RB_INX1   = 125;  // interior der
+static const int TOOL_CX   = 93;   // centro horizontal del texto en panel derecho
+static const int TOOL_Y    = 16;   // baseline nombre de herramienta
+static const int STATUS_Y  = 55;   // baseline texto de estado
+
+static void drawCenteredX(int centerX, int y, const char* s) {
+  int w = u8g2.getStrWidth(s);
+  u8g2.drawStr(centerX - (w / 2), y, s);
 }
 
-static void drawPillOutline(int x,int y,int w,int h){
-  if (h & 1) h--; if (y & 1) y--;
-  u8g2.drawRFrame(x, y, w, h, h/2);
-}
-static void drawPillKnob(int x,int y,int w,int h,float pos){
-  if (h & 1) h--; if (y & 1) y--;
-  int r=h/2, cxL=x+r, cxR=x+w-r-1, cy=y+r;
-  int cx=(int)lroundf(cxL + (cxR - cxL)*pos);
-  int knob = max(2, r-3);
-  u8g2.drawDisc(cx, cy, knob);
-}
-static void drawPillToggle(int x,int y,int w,int h,bool on){
-  drawPillOutline(x,y,w,h);
-  drawPillKnob(x,y,w,h, on?0.0f:1.0f);
-}
+// Dibuja todo el marco fijo (paneles, rana, flechas, toggle, estado y branding).
+// El nombre de la herramienta se dibuja aparte para poder animarlo.
+static void drawPanels(bool active) {
+  u8g2.setFontMode(1);
+  u8g2.setBitmapMode(1);
+  u8g2.setFontPosBaseline();
+  u8g2.setDrawColor(1);
 
-static void drawPaginationDots(int active){
-  int totalW = (kMenuCount * 6) - 2;
-  int startX = (128 - totalW) / 2;
-  for (int i=0;i<kMenuCount;i++) {
-    int x = startX + i*6;
-    if (i == active) u8g2.drawDisc(x, DOT_Y, 2);
-    else             u8g2.drawCircle(x, DOT_Y, 2);
+  // Panel derecho (marco redondeado)
+  u8g2.drawRFrame(RB_X, 2, RB_W, 60, 5);
+
+  // Rana
+  u8g2.drawXBMP(8, 11, 46, 42, image_npi_bits);
+
+  // Panel izquierdo (marco + barras superior/inferior)
+  u8g2.drawLine(2, 60, 2, 3);
+  u8g2.drawLine(59, 8, 2, 8);
+  u8g2.drawLine(59, 55, 2, 55);
+  u8g2.drawLine(62, 2, 2, 2);
+  u8g2.drawBox(2, 2, 58, 7);
+  u8g2.drawLine(63, 61, 2, 61);
+  u8g2.drawXBMP(60, 3, 2, 2, image_paint_11_bits);
+  u8g2.drawBox(2, 55, 59, 6);
+  u8g2.drawXBMP(61, 60, 1, 1, image_paint_13_bits);
+
+  // Toggle segun estado
+  u8g2.drawXBMP(80, 23, 27, 17, active ? image_toggle_active_bits : image_toggle_deactive_bits);
+
+  // Estado (texto bajo el toggle)
+  u8g2.setFont(FONT_TOOL);
+  drawCenteredX(TOOL_CX, STATUS_Y, active ? "ACTIVE" : "DEACTIVE");
+
+  // Ojo de la rana solo en DEACTIVE
+  if (!active) {
+    u8g2.drawXBMP(43, 20, 2, 2, image_paint_11_bits);
   }
-}
 
-static void drawCardAtCenter(int centerX, int menuIndex){
-  const char* label = kMenuLabels[menuIndex];
-  const int W = 128;
-  const int w = W - PAD*2;
-  const int x = centerX - w/2;
-  const int y = HEADER_H + 4;
-  u8g2.setDrawColor(0);
-  u8g2.drawBox(x+1, y+1, w-2, CARD_H-2);
+  // Flechas de navegacion
+  u8g2.drawXBMP(63, 28, 4, 7, image_ButtonLeft_bits);
+  u8g2.drawXBMP(119, 28, 4, 7, image_ButtonRight_bits);
+
+  // Branding (XOR sobre las barras del panel izquierdo)
+  u8g2.setDrawColor(2);
+  u8g2.setFont(FONT_BRAND);
+  u8g2.drawStr(20, 8, "RF-NPI");
+  u8g2.drawStr(18, 61, "V 1.0.0");
   u8g2.setDrawColor(1);
-  u8g2.drawRFrame(x, y, w, CARD_H, RADIUS);
-  u8g2.setFont(FONT_MEDIUM);
-  u8g2.setCursor(x + 12, y + 4);
-  u8g2.print(label);
-  bool isThisFocus = (modeFromMenuIndex(menuIndex) == current_Mode);
-  bool isActive    = (isThisFocus && current == ACTIVE_MODE);
-  const char* status = isActive ? "ACTIVE" : "DEACTIVE";
-  u8g2.setFont(FONT_SMALL);
-  u8g2.setCursor(x + 12, y + 16);
-  u8g2.print(status);
-  bool isOn = (modeFromMenuIndex(menuIndex) == current_Mode) && (current == ACTIVE_MODE);
-  const int pillW=24, pillH=14;
-  const int pillY=(y + ((CARD_H-pillH)/2)) & ~1;
-  drawPillToggle(x + w - pillW - 10, pillY, pillW, pillH, isOn);
 }
 
-static void renderStaticMenu(int focusIndex) {
+static void drawScreenNPI(const char* tool, bool active) {
   u8g2.clearBuffer();
-  drawHeaderBar();
-  drawCardAtCenter(128 / 2, focusIndex);
-  drawPaginationDots(focusIndex);
+  drawPanels(active);
+  u8g2.setFont(FONT_TOOL);
+  drawCenteredX(TOOL_CX, TOOL_Y, tool);
   u8g2.sendBuffer();
 }
 
+static void renderStaticMenu(int focusIndex) {
+  drawScreenNPI(kMenuLabels[focusIndex], current == ACTIVE_MODE);
+}
+
+// Anima el cambio de herramienta deslizando su nombre dentro del panel derecho.
+// dir = +1 -> siguiente (entra desde la derecha), dir = -1 -> anterior.
 static void animateToMenu(int fromIdx, int toIdx) {
-  const int W = 128;
-  const int STEPS = 14;
-  const uint8_t DT = 10;
-  const int dir = (toIdx > fromIdx) ? -1 : 1;
+  const char* fromTool = kMenuLabels[fromIdx];
+  const char* toTool   = kMenuLabels[toIdx];
+  bool active = (current == ACTIVE_MODE);
+
+  int diff = toIdx - fromIdx;
+  int dir  = (diff > 0) ? 1 : -1;
+  if (diff ==  (kMenuCount - 1)) dir = -1; // wrap 0 -> last
+  if (diff == -(kMenuCount - 1)) dir =  1; // wrap last -> 0
+
+  const int SPAN  = 46;   // recorrido del deslizamiento
+  const int STEPS = 12;
+  const uint8_t DT = 12;
   for (int s = 0; s <= STEPS; s++) {
     float t = (float)s / (float)STEPS;
     float e = (t < 0.5f) ? 4.0f*t*t*t : 1.0f - powf(-2.0f*t + 2.0f, 3)/2.0f;
-    int shift = (int)(e * W + 0.5f);
-    int centerFrom = (W/2) + (-dir * shift);
-    int centerTo   = (W/2) + ( dir * (W - shift));
+    int shift = (int)(e * SPAN + 0.5f);
     u8g2.clearBuffer();
-    drawHeaderBar();
-    drawCardAtCenter(centerFrom, fromIdx);
-    drawCardAtCenter(centerTo,   toIdx);
-    drawPaginationDots(toIdx);
+    drawPanels(active);
+    u8g2.setFont(FONT_TOOL);
+    u8g2.setClipWindow(RB_INX0, 3, RB_INX1, 25);
+    drawCenteredX(TOOL_CX - dir * shift,          TOOL_Y, fromTool);
+    drawCenteredX(TOOL_CX + dir * (SPAN - shift), TOOL_Y, toTool);
+    u8g2.setMaxClipWindow();
     u8g2.sendBuffer();
     delay(DT);
   }
-  renderStaticMenu(toIdx);
+  drawScreenNPI(toTool, active);
 }
 
+// Cambia el estado active/deactive con una breve confirmacion visual.
 static void animateToggleKnobForFocus(int focusIdx, bool fromActive, bool toActive){
-  float start = (fromActive ? 0.0f : 1.0f);
-  float end   = (toActive   ? 0.0f : 1.0f);
-  const int STEPS = 10;
-  const uint8_t FRAME_MS = 12;
-  for (int s=0; s<=STEPS; s++){
-    float t = (float)s / (float)STEPS;
-    float e = (t < 0.5f) ? 2.0f*t*t : 1.0f - powf(-2.0f*t + 2.0f, 2)/2.0f;
-    float p = start + (end - start) * e;
-    u8g2.clearBuffer();
-    drawHeaderBar();
-    const int W = 128;
-    const int w = W - PAD*2;
-    const int x = W/2 - w/2;
-    const int y = HEADER_H + 4;
-    u8g2.setDrawColor(0);
-    u8g2.drawBox(x+1, y+1, w-2, CARD_H-2);
-    u8g2.setDrawColor(1);
-    u8g2.drawRFrame(x, y, w, CARD_H, RADIUS);
-    u8g2.setFont(FONT_MEDIUM); u8g2.setCursor(x+12, y+4);  u8g2.print(kMenuLabels[focusIdx]);
-    u8g2.setFont(FONT_SMALL);  u8g2.setCursor(x+12, y+16); u8g2.print("----");
-    const int pillW=24, pillH=14;
-    const int pillY=(y + ((CARD_H-pillH)/2)) & ~1;
-    const int pillX=x + w - pillW - 10;
-    drawPillOutline(pillX, pillY, pillW, pillH);
-    drawPillKnob(pillX, pillY, pillW, pillH, p);
-    drawPaginationDots(focusIdx);
-    u8g2.sendBuffer();
-    delay(FRAME_MS);
-  }
-  renderStaticMenu(focusIdx);
+  (void)fromActive;
+  drawScreenNPI(kMenuLabels[focusIdx], toActive);
 }
 
 void update_OLED() {
-  int focus = menuIndexFromMode(current_Mode);
-  renderStaticMenu(focus);
+  renderStaticMenu(menuIndexFromMode(current_Mode));
 }
 
 void menuPrev() {
